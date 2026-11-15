@@ -16,4 +16,8 @@ export class CartPage {
   async removeProduct(productId: string): Promise<void> {
     await this.page.locator(`[data-test="remove-${productId}"]`).click();
   }
+
+  async proceedToCheckout(): Promise<void> {
+    await this.page.getByRole('button', { name: 'Checkout' }).click();
+  }
 }
