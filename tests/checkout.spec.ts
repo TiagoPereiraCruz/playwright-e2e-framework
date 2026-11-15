@@ -1,31 +1,28 @@
-import { test, expect } from '@playwright/test';
+import { test, expect } from './fixtures';
 import { CartPage } from '../pages/CartPage';
 import { CheckoutCompletePage } from '../pages/CheckoutCompletePage';
 import { CheckoutInformationPage } from '../pages/CheckoutInformationPage';
 import { CheckoutOverviewPage } from '../pages/CheckoutOverviewPage';
 import { InventoryPage } from '../pages/InventoryPage';
-import { LoginPage } from '../pages/LoginPage';
-import { checkoutInformation } from '../test-data/checkout';
+import {
+  checkoutInformation,
+  requiredFieldScenarios,
+} from '../test-data/checkout';
 import { products } from '../test-data/products';
-import { users } from '../test-data/users';
 
 test.describe('Checkout', () => {
-  test.beforeEach(async ({ page }) => {
-    const loginPage = new LoginPage(page);
-    await loginPage.goto();
-    await loginPage.login(users.standard.username, users.standard.password);
-
-    const inventoryPage = new InventoryPage(page);
+  test.beforeEach(async ({ authenticatedPage }) => {
+    const inventoryPage = new InventoryPage(authenticatedPage);
     await inventoryPage.addProduct(products.backpack.id);
     await inventoryPage.addProduct(products.bikeLight.id);
     await inventoryPage.openCart();
-    await new CartPage(page).proceedToCheckout();
+    await new CartPage(authenticatedPage).proceedToCheckout();
   });
 
   test('CHECKOUT-001: complete a purchase with valid information', async ({
-    page,
+    authenticatedPage,
   }) => {
-    const informationPage = new CheckoutInformationPage(page);
+    const informationPage = new CheckoutInformationPage(authenticatedPage);
     await informationPage.fillInformation(
       checkoutInformation.firstName,
       checkoutInformation.lastName,
@@ -33,60 +30,36 @@ test.describe('Checkout', () => {
     );
     await informationPage.continueToOverview();
 
-    const overviewPage = new CheckoutOverviewPage(page);
+    const overviewPage = new CheckoutOverviewPage(authenticatedPage);
     await overviewPage.finishOrder();
 
-    const completePage = new CheckoutCompletePage(page);
+    const completePage = new CheckoutCompletePage(authenticatedPage);
     await expect(completePage.title).toHaveText('Checkout: Complete!');
     await expect(completePage.confirmationMessage).toHaveText(
       'Thank you for your order!',
     );
   });
 
-  test('CHECKOUT-002: require a first name', async ({ page }) => {
-    const informationPage = new CheckoutInformationPage(page);
-    await informationPage.fillInformation(
-      '',
-      checkoutInformation.lastName,
-      checkoutInformation.postalCode,
-    );
-    await informationPage.continueToOverview();
+  for (const scenario of requiredFieldScenarios) {
+    test(scenario.title, async ({ authenticatedPage }) => {
+      const informationPage = new CheckoutInformationPage(authenticatedPage);
+      await informationPage.fillInformation(
+        scenario.firstName,
+        scenario.lastName,
+        scenario.postalCode,
+      );
+      await informationPage.continueToOverview();
 
-    await expect(informationPage.errorMessage).toHaveText(
-      'Error: First Name is required',
-    );
-  });
+      await expect(informationPage.errorMessage).toHaveText(
+        scenario.expectedError,
+      );
+    });
+  }
 
-  test('CHECKOUT-003: require a last name', async ({ page }) => {
-    const informationPage = new CheckoutInformationPage(page);
-    await informationPage.fillInformation(
-      checkoutInformation.firstName,
-      '',
-      checkoutInformation.postalCode,
-    );
-    await informationPage.continueToOverview();
-
-    await expect(informationPage.errorMessage).toHaveText(
-      'Error: Last Name is required',
-    );
-  });
-
-  test('CHECKOUT-004: require a postal code', async ({ page }) => {
-    const informationPage = new CheckoutInformationPage(page);
-    await informationPage.fillInformation(
-      checkoutInformation.firstName,
-      checkoutInformation.lastName,
-      '',
-    );
-    await informationPage.continueToOverview();
-
-    await expect(informationPage.errorMessage).toHaveText(
-      'Error: Postal Code is required',
-    );
-  });
-
-  test('CHECKOUT-005: validate the order totals', async ({ page }) => {
-    const informationPage = new CheckoutInformationPage(page);
+  test('CHECKOUT-005: validate the order totals', async ({
+    authenticatedPage,
+  }) => {
+    const informationPage = new CheckoutInformationPage(authenticatedPage);
     await informationPage.fillInformation(
       checkoutInformation.firstName,
       checkoutInformation.lastName,
@@ -94,7 +67,7 @@ test.describe('Checkout', () => {
     );
     await informationPage.continueToOverview();
 
-    const overviewPage = new CheckoutOverviewPage(page);
+    const overviewPage = new CheckoutOverviewPage(authenticatedPage);
     await expect(overviewPage.products).toHaveCount(2);
     await expect(overviewPage.product(products.backpack.name)).toBeVisible();
     await expect(overviewPage.product(products.bikeLight.name)).toBeVisible();
